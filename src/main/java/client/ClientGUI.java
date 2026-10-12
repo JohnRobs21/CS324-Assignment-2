@@ -326,8 +326,7 @@ public class ClientGUI extends JFrame {
 
         SwingUtilities.invokeLater(() -> {
 
-            ClientGUI gui =
-                    new ClientGUI();
+            ClientGUI gui = new ClientGUI();
 
             gui.setVisible(true);
         });
