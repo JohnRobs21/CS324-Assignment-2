@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package distrilab;
+
+option java_multiple_files = true;
+option java_package = "com.distrilab.grpc";
+option java_outer_classname = "BootstrapProto";
+
+// Bootstrap Node: worker registration, heartbeat-based liveness, and
+// discovery of the active workers and the current coordinator.
+service BootstrapService {
+  // Adds (or re-adds) a worker and returns the current membership.
+  rpc RegisterWorker (RegisterRequest) returns (RegisterResponse);
+
+  // Graceful leave, e.g. when a worker shuts down normally.
+  rpc UnregisterWorker (WorkerId) returns (Ack);
+
+  // Periodic liveness signal. A worker that misses heartbeats for longer
+  // than the timeout is evicted and reported as FAILED.
+  rpc Heartbeat (HeartbeatRequest) returns (HeartbeatResponse);
+
+  // Lookups.
+  rpc GetActiveWorkers (Empty) returns (WorkerList);
+  rpc GetWorker (WorkerId) returns (WorkerInfo);
+  rpc GetCoordinator (Empty) returns (CoordinatorInfo);
+
+  // Records the result of an election. A report with an older term than
+  // the one already known is ignored, so a stale coordinator cannot take
+  // over again. Returns the coordinator the Bootstrap Node now holds.
+  rpc ReportCoordinator (CoordinatorReport) returns (CoordinatorInfo);
+
+  // Server-streaming feed of membership changes. On subscribe the current
+  // workers are sent as JOINED events, followed by live changes.
+  rpc WatchMembership (Empty) returns (stream MembershipEvent);
+}
+
+message Empty {}
+
+message Ack {
+  bool success = 1;
+  string message = 2;
+}
+
+message WorkerId {
+  int32 worker_id = 1;
+}
+
+// Address of a worker's gRPC server. jac and millis_since_heartbeat are
+// filled in by the Bootstrap Node in lookup responses.
+message WorkerInfo {
+  int32 worker_id = 1;
+  string host = 2;
+  int32 port = 3;
+  int32 jac = 4;                     // last Job Allocation Counter reported in a heartbeat
+  int64 millis_since_heartbeat = 5;
+}
+
+message RegisterRequest {
+  WorkerInfo worker = 1;
+}
+
+message RegisterResponse {
+  bool success = 1;
+  string message = 2;
+  repeated WorkerInfo active_workers = 3;  // includes the worker that just registered
+  CoordinatorInfo coordinator = 4;
+  int64 heartbeat_interval_ms = 5;         // how often the worker should call Heartbeat
+}
+
+message HeartbeatRequest {
+  int32 worker_id = 1;
+  int32 jac = 2;
+  // Sent by the coordinator so a restarted Bootstrap Node can relearn it.
+  bool is_coordinator = 3;
+  int64 coordinator_term = 4;
+}
+
+message HeartbeatResponse {
+  // false: the worker is not registered (it was evicted, or the Bootstrap
+  // Node restarted) and must call RegisterWorker again.
+  bool registered = 1;
+  CoordinatorInfo coordinator = 2;
+  int32 active_worker_count = 3;
+}
+
+message WorkerList {
+  repeated WorkerInfo workers = 1;
+  CoordinatorInfo coordinator = 2;
+}
+
+message CoordinatorInfo {
+  bool present = 1;           // false when there is no coordinator or it failed
+  WorkerInfo coordinator = 2;
+  int64 term = 3;             // increases with every election
+}
+
+message CoordinatorReport {
+  int32 coordinator_id = 1;
+  int64 term = 2;
+}
+
+message MembershipEvent {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    JOINED = 1;
+    LEFT = 2;                 // unregistered gracefully
+    FAILED = 3;               // heartbeat timeout, evicted
+    COORDINATOR_CHANGED = 4;
+    COORDINATOR_LOST = 5;     // the coordinator left or failed
+  }
+  Type type = 1;
+  WorkerInfo worker = 2;            // the worker the event is about
+  CoordinatorInfo coordinator = 3;  // coordinator after the event
+  int64 timestamp_ms = 4;
+}

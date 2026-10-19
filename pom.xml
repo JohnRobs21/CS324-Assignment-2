@@ -52,9 +52,9 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <artifactId>protobuf-maven-plugin</artifactId>
                 <version>0.6.1</version>
                 <configuration>
-                    <protocArtifact> com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier} </protocArtifact>
-                    <pluginId> grpc-java </pluginId>
-                    <pluginArtifact> io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier} </pluginArtifact>
+                    <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+                    <pluginId>grpc-java</pluginId>
+                    <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
                 </configuration>
                 <executions>
                     <execution>
@@ -67,4 +67,37 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
             </plugin>
         </plugins>
     </build>
+
+    <!--
+        os-maven-plugin sets os.detected.classifier on the command line, but
+        IDE builds (VS Code / Eclipse m2e) do not run it, which leaves protoc
+        unresolved. These profiles set the same value from the OS instead.
+    -->
+    <profiles>
+        <profile>
+            <id>protoc-windows-x86_64</id>
+            <activation><os><family>windows</family><arch>amd64</arch></os></activation>
+            <properties><os.detected.classifier>windows-x86_64</os.detected.classifier></properties>
+        </profile>
+        <profile>
+            <id>protoc-osx-aarch_64</id>
+            <activation><os><family>mac</family><arch>aarch64</arch></os></activation>
+            <properties><os.detected.classifier>osx-aarch_64</os.detected.classifier></properties>
+        </profile>
+        <profile>
+            <id>protoc-osx-x86_64</id>
+            <activation><os><family>mac</family><arch>x86_64</arch></os></activation>
+            <properties><os.detected.classifier>osx-x86_64</os.detected.classifier></properties>
+        </profile>
+        <profile>
+            <id>protoc-linux-x86_64</id>
+            <activation><os><family>unix</family><name>Linux</name><arch>amd64</arch></os></activation>
+            <properties><os.detected.classifier>linux-x86_64</os.detected.classifier></properties>
+        </profile>
+        <profile>
+            <id>protoc-linux-aarch_64</id>
+            <activation><os><family>unix</family><name>Linux</name><arch>aarch64</arch></os></activation>
+            <properties><os.detected.classifier>linux-aarch_64</os.detected.classifier></properties>
+        </profile>
+    </profiles>
 </project>
